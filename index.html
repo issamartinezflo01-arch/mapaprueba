@@ -3,35 +3,65 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <title>Mapa Logístico - Santa Cruz de la Sierra</title>
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Leaflet.js -->
+  <!-- Leaflet CSS -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIINfQ3iN7G6rXfQv3K6J7b5FJ8Kx4pX7jQ="
     crossorigin=""
   />
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""
-  ></script>
 
   <style>
     html,
     body {
-      height: 100%;
       margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
     }
 
+    body {
+      overflow-x: hidden;
+      background: #f3f4f6;
+    }
+
+    /*
+      Contenedor principal del mapa.
+      Se utiliza una altura basada en viewport para que
+      funcione correctamente tanto en escritorio como móvil.
+    */
     #map {
-      height: calc(100vh - 72px);
       width: 100%;
+      height: 75vh;
+      min-height: 450px;
+      position: relative;
       z-index: 1;
+    }
+
+    @media (max-width: 768px) {
+      #map {
+        height: 72vh;
+        min-height: 420px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      #map {
+        height: 68vh;
+        min-height: 400px;
+      }
+    }
+
+    .leaflet-container {
+      width: 100%;
+      height: 100%;
+      font-family: inherit;
+      background: #e5e7eb;
     }
 
     .leaflet-popup-content-wrapper {
@@ -42,6 +72,9 @@
       margin: 14px;
     }
 
+    /*
+      Marcador personalizado
+    */
     .custom-marker {
       width: 28px;
       height: 28px;
@@ -49,11 +82,12 @@
       transform: rotate(-45deg);
       border: 3px solid white;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      position: relative;
     }
 
     .custom-marker-inner {
-      width: 10px;
-      height: 10px;
+      width: 9px;
+      height: 9px;
       background: white;
       border-radius: 50%;
       position: absolute;
@@ -61,129 +95,260 @@
       left: 6px;
     }
 
+    /*
+      Evita que los controles del mapa queden
+      demasiado pegados a los bordes en móviles.
+    */
+    @media (max-width: 640px) {
+      .leaflet-control-zoom {
+        margin-bottom: 10px !important;
+        margin-left: 10px !important;
+      }
+    }
+
+    /*
+      Overlay del panel lateral
+    */
     .sidebar-overlay {
-      background: rgba(0, 0, 0, 0.35);
+      background: rgba(0, 0, 0, 0.4);
     }
   </style>
 </head>
 
 <body class="bg-gray-100 text-gray-800">
 
-  <!-- =========================
-       BARRA SUPERIOR
-  ========================== -->
-  <header class="h-[72px] bg-white shadow-md flex items-center justify-between px-4 md:px-6 relative z-50">
+  <!-- =====================================================
+       HEADER
+  ====================================================== -->
 
-    <div class="flex items-center gap-3">
-      <div class="bg-blue-600 text-white w-10 h-10 rounded-xl flex items-center justify-center font-bold">
-        SC
+  <header
+    class="bg-white shadow-md relative z-[1000]"
+  >
+    <div
+      class="max-w-[1600px] mx-auto px-4 sm:px-6 py-3"
+    >
+
+      <div
+        class="flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+      >
+
+        <!-- Título -->
+
+        <div class="flex items-center gap-3">
+
+          <div
+            class="bg-blue-600 text-white w-10 h-10 rounded-xl flex items-center justify-center font-bold flex-shrink-0"
+          >
+            SC
+          </div>
+
+          <div>
+            <h1
+              class="font-bold text-lg sm:text-xl leading-tight"
+            >
+              Mapa Logístico
+            </h1>
+
+            <p class="text-xs text-gray-500">
+              Santa Cruz de la Sierra, Bolivia
+            </p>
+          </div>
+
+        </div>
+
+
+        <!-- Controles -->
+
+        <div class="flex items-center gap-2 w-full md:w-auto">
+
+          <label
+            for="businessFilter"
+            class="hidden sm:block text-sm font-medium whitespace-nowrap"
+          >
+            Negocio:
+          </label>
+
+          <select
+            id="businessFilter"
+            class="flex-1 md:flex-none border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="todos">
+              Todos
+            </option>
+          </select>
+
+          <button
+            id="openEditorBtn"
+            type="button"
+            class="bg-gray-900 hover:bg-gray-800 text-white px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap"
+          >
+            <span class="hidden sm:inline">
+              Editar sucursales
+            </span>
+
+            <span class="sm:hidden">
+              Editar
+            </span>
+          </button>
+
+        </div>
+
       </div>
 
-      <div>
-        <h1 class="font-bold text-lg md:text-xl">
-          Mapa Logístico
-        </h1>
-        <p class="text-xs text-gray-500">
-          Santa Cruz de la Sierra
-        </p>
-      </div>
-    </div>
-
-    <!-- Filtro -->
-    <div class="flex items-center gap-2">
-      <label for="businessFilter" class="hidden md:block text-sm font-medium">
-        Negocio:
-      </label>
-
-      <select
-        id="businessFilter"
-        class="border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        <option value="todos">Todos</option>
-      </select>
-
-      <button
-        id="openEditorBtn"
-        class="bg-gray-900 hover:bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
-      >
-        Editar sucursales
-      </button>
     </div>
   </header>
 
-  <!-- =========================
-       MAPA
-  ========================== -->
-  <main class="relative">
 
-    <div id="map"></div>
+  <!-- =====================================================
+       CONTENIDO PRINCIPAL
+  ====================================================== -->
 
-    <!-- Indicador -->
-    <div
-      class="absolute bottom-5 left-5 z-[1000] bg-white rounded-xl shadow-lg px-4 py-3 text-sm"
+  <main
+    class="w-full max-w-[1600px] mx-auto p-2 sm:p-4"
+  >
+
+    <section
+      class="relative bg-white rounded-xl shadow-md overflow-hidden"
     >
-      <div class="font-semibold">Sucursales visibles</div>
-      <div id="branchCounter" class="text-2xl font-bold text-blue-600">
-        0
+
+      <!-- MAPA -->
+
+      <div id="map"></div>
+
+
+      <!-- CONTADOR -->
+
+      <div
+        class="absolute bottom-4 left-4 z-[500] bg-white rounded-xl shadow-lg px-4 py-3"
+      >
+
+        <div
+          class="text-xs sm:text-sm font-semibold text-gray-600"
+        >
+          Sucursales visibles
+        </div>
+
+        <div
+          id="branchCounter"
+          class="text-2xl font-bold text-blue-600"
+        >
+          0
+        </div>
+
       </div>
-    </div>
 
-    <!-- Leyenda -->
-    <div
-      id="legend"
-      class="absolute top-5 right-5 z-[1000] bg-white rounded-xl shadow-lg p-4 min-w-[180px]"
-    >
-      <h3 class="font-bold text-sm mb-3">
-        Negocios
-      </h3>
 
-      <div id="legendContent" class="space-y-2 text-sm"></div>
-    </div>
+      <!-- LEYENDA -->
+
+      <div
+        id="legend"
+        class="absolute top-4 right-4 z-[500] bg-white rounded-xl shadow-lg p-3 sm:p-4 min-w-[150px] max-w-[220px]"
+      >
+
+        <h3
+          class="font-bold text-sm mb-3"
+        >
+          Negocios
+        </h3>
+
+        <div
+          id="legendContent"
+          class="space-y-2 text-xs sm:text-sm"
+        ></div>
+
+      </div>
+
+    </section>
 
   </main>
 
-  <!-- =========================
+
+  <!-- =====================================================
        PANEL DE EDICIÓN
-  ========================== -->
+  ====================================================== -->
+
   <aside
     id="editorPanel"
-    class="fixed top-0 right-0 h-full w-full md:w-[430px] bg-white shadow-2xl z-[2000] transform translate-x-full transition-transform duration-300 flex flex-col"
+    class="
+      fixed
+      top-0
+      right-0
+      h-full
+      w-full
+      sm:w-[430px]
+      bg-white
+      shadow-2xl
+      z-[2000]
+      transform
+      translate-x-full
+      transition-transform
+      duration-300
+      flex
+      flex-col
+    "
   >
 
-    <!-- Header -->
-    <div class="bg-gray-900 text-white px-5 py-4 flex justify-between items-center">
+    <!-- Header panel -->
+
+    <div
+      class="bg-gray-900 text-white px-5 py-4 flex justify-between items-center flex-shrink-0"
+    >
+
       <div>
+
         <h2 class="font-bold text-lg">
           Editor de sucursales
         </h2>
+
         <p class="text-xs text-gray-400">
           Los cambios se guardan automáticamente
         </p>
+
       </div>
 
       <button
         id="closeEditorBtn"
-        class="text-gray-300 hover:text-white text-2xl"
+        type="button"
+        class="text-gray-300 hover:text-white text-2xl leading-none"
       >
         ×
       </button>
+
     </div>
 
-    <!-- Formulario -->
-    <div class="p-5 border-b bg-gray-50">
 
-      <h3 id="formTitle" class="font-bold mb-4">
+    <!-- Formulario -->
+
+    <div
+      class="p-5 border-b bg-gray-50 flex-shrink-0 overflow-y-auto max-h-[65vh] sm:max-h-none"
+    >
+
+      <h3
+        id="formTitle"
+        class="font-bold mb-4"
+      >
         Agregar sucursal
       </h3>
 
-      <form id="branchForm" class="space-y-3">
+      <form
+        id="branchForm"
+        class="space-y-3"
+      >
 
-        <input type="hidden" id="editIndex" value="-1" />
+        <input
+          type="hidden"
+          id="editIndex"
+          value="-1"
+        />
+
 
         <div>
-          <label class="block text-xs font-semibold mb-1">
+          <label
+            class="block text-xs font-semibold mb-1"
+          >
             Código de bodega
           </label>
+
           <input
             id="codigoBodega"
             required
@@ -193,10 +358,14 @@
           />
         </div>
 
+
         <div>
-          <label class="block text-xs font-semibold mb-1">
+          <label
+            class="block text-xs font-semibold mb-1"
+          >
             Nombre de sucursal
           </label>
+
           <input
             id="nombreSucursal"
             required
@@ -206,10 +375,14 @@
           />
         </div>
 
+
         <div>
-          <label class="block text-xs font-semibold mb-1">
+          <label
+            class="block text-xs font-semibold mb-1"
+          >
             Negocio
           </label>
+
           <input
             id="negocio"
             required
@@ -219,10 +392,14 @@
           />
         </div>
 
+
         <div>
-          <label class="block text-xs font-semibold mb-1">
+          <label
+            class="block text-xs font-semibold mb-1"
+          >
             Dirección
           </label>
+
           <input
             id="direccion"
             required
@@ -232,12 +409,17 @@
           />
         </div>
 
+
         <div class="grid grid-cols-2 gap-3">
 
           <div>
-            <label class="block text-xs font-semibold mb-1">
+
+            <label
+              class="block text-xs font-semibold mb-1"
+            >
               Latitud
             </label>
+
             <input
               id="lat"
               required
@@ -246,12 +428,18 @@
               placeholder="-17.7430222"
               class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
+
           </div>
 
+
           <div>
-            <label class="block text-xs font-semibold mb-1">
+
+            <label
+              class="block text-xs font-semibold mb-1"
+            >
               Longitud
             </label>
+
             <input
               id="lng"
               required
@@ -260,16 +448,22 @@
               placeholder="-63.1448105"
               class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
+
           </div>
 
         </div>
 
+
         <div class="grid grid-cols-2 gap-3">
 
           <div>
-            <label class="block text-xs font-semibold mb-1">
+
+            <label
+              class="block text-xs font-semibold mb-1"
+            >
               Pedidos totales
             </label>
+
             <input
               id="pedidosTotal"
               required
@@ -278,12 +472,18 @@
               placeholder="136"
               class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
+
           </div>
 
+
           <div>
-            <label class="block text-xs font-semibold mb-1">
+
+            <label
+              class="block text-xs font-semibold mb-1"
+            >
               Pedidos cancelados
             </label>
+
             <input
               id="pedidosCancelados"
               required
@@ -292,9 +492,11 @@
               placeholder="1"
               class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
+
           </div>
 
         </div>
+
 
         <div class="flex gap-2 pt-2">
 
@@ -316,12 +518,20 @@
         </div>
 
       </form>
+
     </div>
 
-    <!-- Lista -->
-    <div class="flex-1 overflow-y-auto p-5">
 
-      <div class="flex justify-between items-center mb-3">
+    <!-- Lista -->
+
+    <div
+      class="flex-1 overflow-y-auto p-5"
+    >
+
+      <div
+        class="flex justify-between items-center mb-3"
+      >
+
         <h3 class="font-bold">
           Sucursales registradas
         </h3>
@@ -332,901 +542,1706 @@
         >
           0
         </span>
+
       </div>
 
-      <div id="branchList" class="space-y-2"></div>
+      <div
+        id="branchList"
+        class="space-y-2"
+      ></div>
 
     </div>
 
   </aside>
 
+
   <!-- Overlay -->
+
   <div
     id="editorOverlay"
     class="hidden fixed inset-0 sidebar-overlay z-[1500]"
   ></div>
 
 
-<script>
-/* ============================================================
-   BASE DE DATOS INICIAL
-   ============================================================ */
-
-const initialData = {
-  "sucursales": [
-    {
-      "codigoBodega": "B1AC",
-      "nombreSucursal": "Farmacorp - Cambodromo",
-      "negocio": "Farmacorp",
-      "direccion": "SC-165 CAMBODROMO 6TO ANILLO",
-      "lat": -17.7430222,
-      "lng": -63.1448105,
-      "pedidosTotal": 136,
-      "pedidosCancelados": 1,
-      "tasaCancelacion": 0.74
-    },
-    {
-      "codigoBodega": "B1BM",
-      "nombreSucursal": "Farmacorp - Satelite Norte",
-      "negocio": "Farmacorp",
-      "direccion": "SC - URBANIZACIÓN SATÉLITE NORTE MZA 78",
-      "lat": -17.6049896,
-      "lng": -63.1418556,
-      "pedidosTotal": 266,
-      "pedidosCancelados": 15,
-      "tasaCancelacion": 5.64
-    }
-  ]
-};
-
-
-/* ============================================================
-   CONFIGURACIÓN
-   ============================================================ */
-
-const STORAGE_KEY = "sucursales_logisticas_v1";
-
-const DEFAULT_CENTER = [-17.7833, -63.1821];
-
-const COLORS = [
-  "#2563eb",
-  "#dc2626",
-  "#16a34a",
-  "#9333ea",
-  "#ea580c",
-  "#0891b2",
-  "#ca8a04",
-  "#db2777",
-  "#4f46e5",
-  "#059669"
-];
-
-let branches = [];
-let markers = [];
-let activeCircle = null;
-let negocioColors = {};
-
-
-/* ============================================================
-   MAPA
-   ============================================================ */
-
-const map = L.map("map", {
-  zoomControl: true
-}).setView(DEFAULT_CENTER, 12);
-
-L.tileLayer(
-  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-  {
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 19
-  }
-).addTo(map);
-
-
-/* ============================================================
-   LOCAL STORAGE
-   ============================================================ */
-
-function loadData() {
-
-  const saved = localStorage.getItem(STORAGE_KEY);
-
-  if (saved) {
-
-    try {
-
-      const parsed = JSON.parse(saved);
-
-      if (
-        parsed &&
-        Array.isArray(parsed.sucursales)
-      ) {
-        branches = parsed.sucursales;
-        return;
-      }
-
-    } catch (error) {
-      console.error("Error leyendo LocalStorage:", error);
-    }
-  }
-
-  branches = structuredClone(initialData.sucursales);
-
-  saveData();
-}
-
-
-function saveData() {
-
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify({
-      sucursales: branches
-    })
-  );
-}
-
-
-/* ============================================================
-   UTILIDADES
-   ============================================================ */
-
-function calculateCancellationRate(total, cancelled) {
-
-  total = Number(total);
-  cancelled = Number(cancelled);
-
-  if (!total || total <= 0) {
-    return 0;
-  }
-
-  return Number(
-    ((cancelled / total) * 100).toFixed(2)
-  );
-}
-
-
-function getBusinessColor(negocio) {
-
-  if (!negocioColors[negocio]) {
-
-    const usedColors = Object.values(negocioColors);
-
-    const availableColor = COLORS.find(
-      color => !usedColors.includes(color)
-    );
-
-    negocioColors[negocio] =
-      availableColor ||
-      COLORS[
-        Object.keys(negocioColors).length % COLORS.length
-      ];
-  }
-
-  return negocioColors[negocio];
-}
-
-
-function escapeHTML(value) {
-
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
-
-/* ============================================================
-   MARCADOR PERSONALIZADO
-   ============================================================ */
-
-function createMarkerIcon(color) {
-
-  return L.divIcon({
-    className: "",
-    html: `
-      <div
-        class="custom-marker"
-        style="background:${color}; position:relative;"
-      >
-        <div class="custom-marker-inner"></div>
-      </div>
-    `,
-    iconSize: [28, 28],
-    iconAnchor: [14, 28],
-    popupAnchor: [0, -28]
-  });
-}
-
-
-/* ============================================================
-   POPUP
-   ============================================================ */
-
-function createPopup(branch) {
-
-  const rate = Number(branch.tasaCancelacion).toFixed(2);
-
-  return `
-    <div style="min-width:250px;">
-
-      <div style="
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        gap:10px;
-        margin-bottom:10px;
-      ">
-
-        <strong style="font-size:16px;">
-          ${escapeHTML(branch.nombreSucursal)}
-        </strong>
-
-        <span style="
-          background:#eff6ff;
-          color:#1d4ed8;
-          padding:3px 7px;
-          border-radius:6px;
-          font-size:11px;
-          font-weight:bold;
-        ">
-          ${escapeHTML(branch.codigoBodega)}
-        </span>
-
-      </div>
-
-      <div style="
-        color:#6b7280;
-        font-size:12px;
-        margin-bottom:12px;
-      ">
-        ${escapeHTML(branch.negocio)}
-      </div>
-
-      <div style="
-        background:#f9fafb;
-        padding:10px;
-        border-radius:8px;
-        margin-bottom:10px;
-        font-size:12px;
-      ">
-        <strong>Dirección</strong><br>
-        ${escapeHTML(branch.direccion)}
-      </div>
-
-      <div style="
-        display:grid;
-        grid-template-columns:1fr 1fr;
-        gap:8px;
-      ">
-
-        <div style="
-          background:#eff6ff;
-          padding:9px;
-          border-radius:8px;
-          text-align:center;
-        ">
-          <div style="font-size:11px;color:#6b7280;">
-            Pedidos
-          </div>
-
-          <strong style="font-size:18px;">
-            ${Number(branch.pedidosTotal).toLocaleString("es-BO")}
-          </strong>
-        </div>
-
-        <div style="
-          background:#fef2f2;
-          padding:9px;
-          border-radius:8px;
-          text-align:center;
-        ">
-          <div style="font-size:11px;color:#6b7280;">
-            Cancelados
-          </div>
-
-          <strong style="
-            font-size:18px;
-            color:#dc2626;
-          ">
-            ${Number(branch.pedidosCancelados).toLocaleString("es-BO")}
-          </strong>
-        </div>
-
-      </div>
-
-      <div style="
-        margin-top:10px;
-        background:#f3f4f6;
-        border-radius:8px;
-        padding:9px;
-        text-align:center;
-      ">
-        <span style="font-size:11px;color:#6b7280;">
-          Tasa de cancelación
-        </span>
-
-        <div style="
-          font-size:20px;
-          font-weight:bold;
-          color:${rate >= 5 ? "#dc2626" : "#16a34a"};
-        ">
-          ${rate}%
-        </div>
-      </div>
-
-      <div style="
-        margin-top:10px;
-        font-size:10px;
-        color:#9ca3af;
-        text-align:center;
-      ">
-        Radio mostrado: 1 km
-      </div>
-
-    </div>
-  `;
-}
-
-
-/* ============================================================
-   DIBUJAR SUCURSALES
-   ============================================================ */
-
-function renderMarkers() {
-
-  markers.forEach(marker => {
-    map.removeLayer(marker);
-  });
-
-  markers = [];
-
-  if (activeCircle) {
-    map.removeLayer(activeCircle);
-    activeCircle = null;
-  }
-
-  const filter =
-    document.getElementById("businessFilter").value;
-
-  const visibleBranches = branches.filter(branch => {
-
-    if (filter === "todos") {
-      return true;
-    }
-
-    return branch.negocio === filter;
-  });
-
-
-  visibleBranches.forEach(branch => {
-
-    const color = getBusinessColor(branch.negocio);
-
-    const marker = L.marker(
-      [Number(branch.lat), Number(branch.lng)],
+  <!-- =====================================================
+       LEAFLET JS
+  ====================================================== -->
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    crossorigin=""
+  ></script>
+
+
+  <script>
+
+    /* =====================================================
+       BASE DE DATOS
+    ===================================================== */
+
+    const initialData = {
+      "sucursales": [
+        {
+          "codigoBodega": "B1AC",
+          "nombreSucursal": "Farmacorp - Cambodromo",
+          "negocio": "Farmacorp",
+          "direccion": "SC-165 CAMBODROMO 6TO ANILLO",
+          "lat": -17.7430222,
+          "lng": -63.1448105,
+          "pedidosTotal": 136,
+          "pedidosCancelados": 1,
+          "tasaCancelacion": 0.74
+        },
+        {
+          "codigoBodega": "B1BM",
+          "nombreSucursal": "Farmacorp - Satelite Norte",
+          "negocio": "Farmacorp",
+          "direccion": "SC - URBANIZACIÓN SATÉLITE NORTE MZA 78",
+          "lat": -17.6049896,
+          "lng": -63.1418556,
+          "pedidosTotal": 266,
+          "pedidosCancelados": 15,
+          "tasaCancelacion": 5.64
+        }
+      ]
+    };
+
+
+    /* =====================================================
+       CONFIGURACIÓN
+    ===================================================== */
+
+    const STORAGE_KEY =
+      "sucursales_logisticas_v2";
+
+    /*
+      Este centro solamente funciona como respaldo.
+      El mapa se centrará realmente utilizando
+      las coordenadas de las sucursales.
+    */
+
+    const SANTA_CRUZ_CENTER =
+      [-17.7833, -63.1821];
+
+    const DEFAULT_ZOOM = 12;
+
+    const COLORS = [
+      "#2563eb",
+      "#dc2626",
+      "#16a34a",
+      "#9333ea",
+      "#ea580c",
+      "#0891b2",
+      "#ca8a04",
+      "#db2777",
+      "#4f46e5",
+      "#059669"
+    ];
+
+    let branches = [];
+
+    let markers = [];
+
+    let activeCircle = null;
+
+    let negocioColors = {};
+
+
+    /* =====================================================
+       CREAR MAPA
+    ===================================================== */
+
+    const map =
+      L.map("map", {
+        zoomControl: true,
+        preferCanvas: false
+      });
+
+
+    /*
+      Capa OpenStreetMap
+    */
+
+    L.tileLayer(
+      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
       {
-        icon: createMarkerIcon(color)
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+
+        maxZoom: 19,
+
+        minZoom: 3,
+
+        detectRetina: true
       }
     ).addTo(map);
 
-    marker.bindPopup(
-      createPopup(branch),
-      {
-        maxWidth: 350
-      }
-    );
 
+    /* =====================================================
+       LOCAL STORAGE
+    ===================================================== */
 
-    marker.on("click", function () {
+    function loadData() {
 
-      if (activeCircle) {
-        map.removeLayer(activeCircle);
-      }
+      const saved =
+        localStorage.getItem(STORAGE_KEY);
 
-      activeCircle = L.circle(
-        [Number(branch.lat), Number(branch.lng)],
-        {
-          radius: 1000,
-          color: color,
-          fillColor: color,
-          fillOpacity: 0.12,
-          weight: 2
+      if (saved) {
+
+        try {
+
+          const parsed =
+            JSON.parse(saved);
+
+          if (
+            parsed &&
+            Array.isArray(parsed.sucursales) &&
+            parsed.sucursales.length > 0
+          ) {
+
+            branches =
+              parsed.sucursales;
+
+            return;
+          }
+
+        } catch (error) {
+
+          console.error(
+            "Error leyendo LocalStorage:",
+            error
+          );
+
         }
-      ).addTo(map);
 
-      activeCircle.bindTooltip(
-        "Radio: 1 km",
+      }
+
+
+      branches =
+        structuredClone(
+          initialData.sucursales
+        );
+
+      saveData();
+
+    }
+
+
+    function saveData() {
+
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          sucursales: branches
+        })
+      );
+
+    }
+
+
+    /* =====================================================
+       CALCULAR CENTRO DESDE LAS SUCURSALES
+    ===================================================== */
+
+    function centerMapOnBranches() {
+
+      /*
+        Filtramos únicamente coordenadas válidas.
+      */
+
+      const validBranches =
+        branches.filter(branch =>
+          Number.isFinite(Number(branch.lat)) &&
+          Number.isFinite(Number(branch.lng))
+        );
+
+
+      /*
+        Si no existen coordenadas,
+        usamos Santa Cruz como respaldo.
+      */
+
+      if (validBranches.length === 0) {
+
+        map.setView(
+          SANTA_CRUZ_CENTER,
+          DEFAULT_ZOOM
+        );
+
+        return;
+      }
+
+
+      /*
+        Una sola sucursal:
+        centramos directamente.
+      */
+
+      if (validBranches.length === 1) {
+
+        map.setView(
+          [
+            Number(validBranches[0].lat),
+            Number(validBranches[0].lng)
+          ],
+          14
+        );
+
+        return;
+      }
+
+
+      /*
+        Varias sucursales:
+        Leaflet calcula automáticamente
+        el área que las contiene.
+      */
+
+      const bounds =
+        L.latLngBounds(
+          validBranches.map(branch => [
+            Number(branch.lat),
+            Number(branch.lng)
+          ])
+        );
+
+
+      map.fitBounds(
+        bounds,
         {
-          permanent: false,
-          direction: "center"
+          padding: [70, 70],
+          maxZoom: 14,
+          animate: false
         }
       );
 
-    });
+    }
 
 
-    markers.push(marker);
+    /* =====================================================
+       INVALIDATE SIZE
+    ===================================================== */
 
-  });
+    function refreshMapSize() {
 
-  document.getElementById("branchCounter").textContent =
-    visibleBranches.length;
+      /*
+        Obligatorio cuando Leaflet está dentro
+        de un contenedor cuyo tamaño puede cambiar.
+      */
 
-}
+      map.invalidateSize({
+        animate: false,
+        pan: false
+      });
 
+    }
 
-/* ============================================================
-   FILTRO DE NEGOCIOS
-   ============================================================ */
 
-function updateBusinessFilter() {
+    /* =====================================================
+       UTILIDADES
+    ===================================================== */
 
-  const select =
-    document.getElementById("businessFilter");
+    function calculateCancellationRate(
+      total,
+      cancelled
+    ) {
 
-  const currentValue = select.value;
+      total = Number(total);
+      cancelled = Number(cancelled);
 
-  const businesses = [
-    ...new Set(
-      branches
-        .map(branch => branch.negocio)
-        .filter(Boolean)
-    )
-  ].sort();
+      if (!total || total <= 0) {
+        return 0;
+      }
 
-  select.innerHTML = `
-    <option value="todos">
-      Todos
-    </option>
-  `;
+      return Number(
+        (
+          (cancelled / total) *
+          100
+        ).toFixed(2)
+      );
 
-  businesses.forEach(business => {
+    }
 
-    const option = document.createElement("option");
 
-    option.value = business;
-    option.textContent = business;
+    function getBusinessColor(
+      negocio
+    ) {
 
-    select.appendChild(option);
+      if (!negocioColors[negocio]) {
 
-  });
+        const usedColors =
+          Object.values(
+            negocioColors
+          );
 
-  if (businesses.includes(currentValue)) {
-    select.value = currentValue;
-  }
+        const availableColor =
+          COLORS.find(
+            color =>
+              !usedColors.includes(color)
+          );
 
-  renderLegend();
+        negocioColors[negocio] =
+          availableColor ||
+          COLORS[
+            Object.keys(
+              negocioColors
+            ).length %
+            COLORS.length
+          ];
 
-}
+      }
 
+      return negocioColors[negocio];
 
-document
-  .getElementById("businessFilter")
-  .addEventListener("change", renderMarkers);
+    }
 
 
-/* ============================================================
-   LEYENDA
-   ============================================================ */
+    function escapeHTML(value) {
 
-function renderLegend() {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 
-  const container =
-    document.getElementById("legendContent");
+    }
 
-  const businesses = [
-    ...new Set(
-      branches
-        .map(branch => branch.negocio)
-        .filter(Boolean)
-    )
-  ].sort();
 
-  container.innerHTML = "";
+    /* =====================================================
+       ICONO
+    ===================================================== */
 
-  businesses.forEach(business => {
+    function createMarkerIcon(color) {
 
-    const color = getBusinessColor(business);
+      return L.divIcon({
 
-    const row = document.createElement("div");
+        className: "",
 
-    row.className =
-      "flex items-center gap-2";
+        html: `
+          <div
+            class="custom-marker"
+            style="background:${color};"
+          >
+            <div class="custom-marker-inner"></div>
+          </div>
+        `,
 
-    row.innerHTML = `
-      <span
-        class="w-3 h-3 rounded-full"
-        style="background:${color}"
-      ></span>
+        iconSize: [28, 28],
 
-      <span>
-        ${escapeHTML(business)}
-      </span>
-    `;
+        iconAnchor: [14, 28],
 
-    container.appendChild(row);
+        popupAnchor: [0, -28]
 
-  });
+      });
 
-}
+    }
 
 
-/* ============================================================
-   PANEL DE EDICIÓN
-   ============================================================ */
+    /* =====================================================
+       POPUP
+    ===================================================== */
+
+    function createPopup(branch) {
 
-const editorPanel =
-  document.getElementById("editorPanel");
+      const rate =
+        Number(
+          branch.tasaCancelacion
+        ).toFixed(2);
 
-const editorOverlay =
-  document.getElementById("editorOverlay");
 
+      return `
 
-function openEditor() {
+        <div style="min-width:250px;">
 
-  editorPanel.classList.remove("translate-x-full");
-  editorOverlay.classList.remove("hidden");
+          <div style="
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            gap:10px;
+            margin-bottom:10px;
+          ">
 
-  renderBranchList();
+            <strong style="font-size:16px;">
+              ${escapeHTML(
+                branch.nombreSucursal
+              )}
+            </strong>
 
-}
+            <span style="
+              background:#eff6ff;
+              color:#1d4ed8;
+              padding:3px 7px;
+              border-radius:6px;
+              font-size:11px;
+              font-weight:bold;
+            ">
+              ${escapeHTML(
+                branch.codigoBodega
+              )}
+            </span>
 
+          </div>
 
-function closeEditor() {
 
-  editorPanel.classList.add("translate-x-full");
-  editorOverlay.classList.add("hidden");
+          <div style="
+            color:#6b7280;
+            font-size:12px;
+            margin-bottom:12px;
+          ">
+            ${escapeHTML(
+              branch.negocio
+            )}
+          </div>
 
-  resetForm();
 
-}
+          <div style="
+            background:#f9fafb;
+            padding:10px;
+            border-radius:8px;
+            margin-bottom:10px;
+            font-size:12px;
+          ">
 
+            <strong>
+              Dirección
+            </strong>
 
-document
-  .getElementById("openEditorBtn")
-  .addEventListener("click", openEditor);
+            <br>
 
-document
-  .getElementById("closeEditorBtn")
-  .addEventListener("click", closeEditor);
+            ${escapeHTML(
+              branch.direccion
+            )}
 
-editorOverlay.addEventListener(
-  "click",
-  closeEditor
-);
+          </div>
 
 
-/* ============================================================
-   FORMULARIO
-   ============================================================ */
+          <div style="
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:8px;
+          ">
 
-const form =
-  document.getElementById("branchForm");
+            <div style="
+              background:#eff6ff;
+              padding:9px;
+              border-radius:8px;
+              text-align:center;
+            ">
 
+              <div style="
+                font-size:11px;
+                color:#6b7280;
+              ">
+                Pedidos
+              </div>
 
-form.addEventListener("submit", function(event) {
+              <strong style="font-size:18px;">
+                ${Number(
+                  branch.pedidosTotal
+                ).toLocaleString("es-BO")}
+              </strong>
 
-  event.preventDefault();
-
-  const index =
-    Number(document.getElementById("editIndex").value);
-
-  const branch = {
-
-    codigoBodega:
-      document.getElementById("codigoBodega").value.trim(),
-
-    nombreSucursal:
-      document.getElementById("nombreSucursal").value.trim(),
-
-    negocio:
-      document.getElementById("negocio").value.trim(),
-
-    direccion:
-      document.getElementById("direccion").value.trim(),
-
-    lat:
-      Number(document.getElementById("lat").value),
-
-    lng:
-      Number(document.getElementById("lng").value),
-
-    pedidosTotal:
-      parseInt(
-        document.getElementById("pedidosTotal").value,
-        10
-      ),
-
-    pedidosCancelados:
-      parseInt(
-        document.getElementById("pedidosCancelados").value,
-        10
-      )
-
-  };
-
-  branch.tasaCancelacion =
-    calculateCancellationRate(
-      branch.pedidosTotal,
-      branch.pedidosCancelados
-    );
-
-
-  if (index === -1) {
-
-    branches.push(branch);
-
-  } else {
-
-    branches[index] = branch;
-
-  }
-
-  saveData();
-
-  updateBusinessFilter();
-
-  renderMarkers();
-
-  renderBranchList();
-
-  resetForm();
-
-});
-
-
-/* ============================================================
-   EDITAR
-   ============================================================ */
-
-function editBranch(index) {
-
-  const branch = branches[index];
-
-  document.getElementById("editIndex").value =
-    index;
-
-  document.getElementById("codigoBodega").value =
-    branch.codigoBodega;
-
-  document.getElementById("nombreSucursal").value =
-    branch.nombreSucursal;
-
-  document.getElementById("negocio").value =
-    branch.negocio;
-
-  document.getElementById("direccion").value =
-    branch.direccion;
-
-  document.getElementById("lat").value =
-    branch.lat;
-
-  document.getElementById("lng").value =
-    branch.lng;
-
-  document.getElementById("pedidosTotal").value =
-    branch.pedidosTotal;
-
-  document.getElementById("pedidosCancelados").value =
-    branch.pedidosCancelados;
-
-  document.getElementById("formTitle").textContent =
-    "Editar sucursal";
-
-  document
-    .getElementById("cancelEditBtn")
-    .classList.remove("hidden");
-
-  document
-    .getElementById("codigoBodega")
-    .focus();
-
-}
-
-
-/* ============================================================
-   ELIMINAR
-   ============================================================ */
-
-function deleteBranch(index) {
-
-  const branch = branches[index];
-
-  const confirmed = confirm(
-    `¿Eliminar la sucursal "${branch.nombreSucursal}"?`
-  );
-
-  if (!confirmed) {
-    return;
-  }
-
-  branches.splice(index, 1);
-
-  saveData();
-
-  updateBusinessFilter();
-
-  renderMarkers();
-
-  renderBranchList();
-
-  resetForm();
-
-}
-
-
-/* ============================================================
-   LISTA DEL PANEL
-   ============================================================ */
-
-function renderBranchList() {
-
-  const container =
-    document.getElementById("branchList");
-
-  document.getElementById("editorCounter").textContent =
-    branches.length;
-
-  container.innerHTML = "";
-
-  if (branches.length === 0) {
-
-    container.innerHTML = `
-      <div class="text-center py-10 text-gray-400">
-        <div class="text-3xl mb-2">📍</div>
-        <p class="text-sm">
-          No existen sucursales registradas.
-        </p>
-      </div>
-    `;
-
-    return;
-  }
-
-
-  branches.forEach((branch, index) => {
-
-    const color =
-      getBusinessColor(branch.negocio);
-
-    const card =
-      document.createElement("div");
-
-    card.className =
-      "border rounded-xl p-3 hover:shadow-md transition";
-
-    card.innerHTML = `
-
-      <div class="flex items-start justify-between gap-2">
-
-        <div class="flex items-start gap-2">
-
-          <span
-            class="w-3 h-3 rounded-full mt-1.5 flex-shrink-0"
-            style="background:${color}"
-          ></span>
-
-          <div>
-
-            <div class="font-semibold text-sm">
-              ${escapeHTML(branch.nombreSucursal)}
             </div>
 
-            <div class="text-xs text-gray-500">
-              ${escapeHTML(branch.codigoBodega)}
-              ·
-              ${escapeHTML(branch.negocio)}
+
+            <div style="
+              background:#fef2f2;
+              padding:9px;
+              border-radius:8px;
+              text-align:center;
+            ">
+
+              <div style="
+                font-size:11px;
+                color:#6b7280;
+              ">
+                Cancelados
+              </div>
+
+              <strong style="
+                font-size:18px;
+                color:#dc2626;
+              ">
+                ${Number(
+                  branch.pedidosCancelados
+                ).toLocaleString("es-BO")}
+              </strong>
+
             </div>
 
           </div>
 
-        </div>
 
-        <div class="text-xs font-bold text-red-600">
-          ${Number(branch.tasaCancelacion).toFixed(2)}%
-        </div>
+          <div style="
+            margin-top:10px;
+            background:#f3f4f6;
+            border-radius:8px;
+            padding:9px;
+            text-align:center;
+          ">
 
-      </div>
+            <span style="
+              font-size:11px;
+              color:#6b7280;
+            ">
+              Tasa de cancelación
+            </span>
 
-      <div class="text-xs text-gray-500 mt-2">
-        ${escapeHTML(branch.direccion)}
-      </div>
+            <div style="
+              font-size:20px;
+              font-weight:bold;
+              color:${
+                rate >= 5
+                  ? "#dc2626"
+                  : "#16a34a"
+              };
+            ">
+              ${rate}%
+            </div>
 
-      <div class="flex items-center justify-between mt-3">
+          </div>
 
-        <div class="text-xs">
-          <strong>
-            ${Number(branch.pedidosTotal).toLocaleString("es-BO")}
-          </strong>
-          pedidos
-          ·
-          <strong class="text-red-600">
-            ${Number(branch.pedidosCancelados).toLocaleString("es-BO")}
-          </strong>
-          cancelados
-        </div>
 
-        <div class="flex gap-1">
-
-          <button
-            onclick="editBranch(${index})"
-            class="px-2 py-1 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 rounded"
-          >
-            Editar
-          </button>
-
-          <button
-            onclick="deleteBranch(${index})"
-            class="px-2 py-1 text-xs bg-red-50 text-red-700 hover:bg-red-100 rounded"
-          >
-            Eliminar
-          </button>
+          <div style="
+            margin-top:10px;
+            font-size:10px;
+            color:#9ca3af;
+            text-align:center;
+          ">
+            Radio mostrado: 1 km
+          </div>
 
         </div>
 
-      </div>
-    `;
+      `;
 
-    container.appendChild(card);
-
-  });
-
-}
+    }
 
 
-/* ============================================================
-   LIMPIAR FORMULARIO
-   ============================================================ */
+    /* =====================================================
+       RENDERIZAR MARCADORES
+    ===================================================== */
 
-function resetForm() {
+    function renderMarkers() {
 
-  form.reset();
+      /*
+        Eliminar marcadores anteriores.
+      */
 
-  document.getElementById("editIndex").value =
-    "-1";
+      markers.forEach(
+        marker =>
+          map.removeLayer(marker)
+      );
 
-  document.getElementById("formTitle").textContent =
-    "Agregar sucursal";
-
-  document
-    .getElementById("cancelEditBtn")
-    .classList.add("hidden");
-
-}
+      markers = [];
 
 
-document
-  .getElementById("cancelEditBtn")
-  .addEventListener("click", resetForm);
+      /*
+        Eliminar círculo anterior.
+      */
+
+      if (activeCircle) {
+
+        map.removeLayer(
+          activeCircle
+        );
+
+        activeCircle = null;
+
+      }
 
 
-/* ============================================================
-   INICIALIZACIÓN
-   ============================================================ */
-
-loadData();
-
-updateBusinessFilter();
-
-renderMarkers();
-
-renderBranchList();
+      const filter =
+        document.getElementById(
+          "businessFilter"
+        ).value;
 
 
-/* ============================================================
-   AJUSTE DEL MAPA
-   ============================================================ */
+      const visibleBranches =
+        branches.filter(branch => {
 
-setTimeout(() => {
-  map.invalidateSize();
-}, 300);
+          if (filter === "todos") {
+            return true;
+          }
 
-</script>
+          return (
+            branch.negocio === filter
+          );
+
+        });
+
+
+      visibleBranches.forEach(
+        branch => {
+
+          const lat =
+            Number(branch.lat);
+
+          const lng =
+            Number(branch.lng);
+
+
+          /*
+            Ignorar coordenadas inválidas.
+          */
+
+          if (
+            !Number.isFinite(lat) ||
+            !Number.isFinite(lng)
+          ) {
+            return;
+          }
+
+
+          const color =
+            getBusinessColor(
+              branch.negocio
+            );
+
+
+          const marker =
+            L.marker(
+              [lat, lng],
+              {
+                icon:
+                  createMarkerIcon(
+                    color
+                  )
+              }
+            ).addTo(map);
+
+
+          marker.bindPopup(
+            createPopup(branch),
+            {
+              maxWidth: 350
+            }
+          );
+
+
+          marker.on(
+            "click",
+            function() {
+
+              if (activeCircle) {
+
+                map.removeLayer(
+                  activeCircle
+                );
+
+              }
+
+
+              /*
+                EXACTAMENTE 1000 metros.
+              */
+
+              activeCircle =
+                L.circle(
+                  [lat, lng],
+                  {
+                    radius: 1000,
+                    color: color,
+                    fillColor: color,
+                    fillOpacity: 0.12,
+                    weight: 2
+                  }
+                ).addTo(map);
+
+
+              activeCircle.bindTooltip(
+                "Radio: 1 km",
+                {
+                  direction: "center"
+                }
+              );
+
+            }
+          );
+
+
+          markers.push(marker);
+
+        }
+      );
+
+
+      document.getElementById(
+        "branchCounter"
+      ).textContent =
+        visibleBranches.length;
+
+    }
+
+
+    /* =====================================================
+       FILTRO
+    ===================================================== */
+
+    function updateBusinessFilter() {
+
+      const select =
+        document.getElementById(
+          "businessFilter"
+        );
+
+
+      const previousValue =
+        select.value;
+
+
+      const businesses =
+        [
+          ...new Set(
+            branches
+              .map(
+                branch =>
+                  branch.negocio
+              )
+              .filter(Boolean)
+          )
+        ].sort();
+
+
+      select.innerHTML = `
+        <option value="todos">
+          Todos
+        </option>
+      `;
+
+
+      businesses.forEach(
+        business => {
+
+          const option =
+            document.createElement(
+              "option"
+            );
+
+          option.value =
+            business;
+
+          option.textContent =
+            business;
+
+          select.appendChild(
+            option
+          );
+
+        }
+      );
+
+
+      if (
+        businesses.includes(
+          previousValue
+        )
+      ) {
+
+        select.value =
+          previousValue;
+
+      }
+
+
+      renderLegend();
+
+    }
+
+
+    document
+      .getElementById(
+        "businessFilter"
+      )
+      .addEventListener(
+        "change",
+        function() {
+
+          renderMarkers();
+
+        }
+      );
+
+
+    /* =====================================================
+       LEYENDA
+    ===================================================== */
+
+    function renderLegend() {
+
+      const container =
+        document.getElementById(
+          "legendContent"
+        );
+
+
+      const businesses =
+        [
+          ...new Set(
+            branches
+              .map(
+                branch =>
+                  branch.negocio
+              )
+              .filter(Boolean)
+          )
+        ].sort();
+
+
+      container.innerHTML = "";
+
+
+      businesses.forEach(
+        business => {
+
+          const color =
+            getBusinessColor(
+              business
+            );
+
+
+          const row =
+            document.createElement(
+              "div"
+            );
+
+
+          row.className =
+            "flex items-center gap-2";
+
+
+          row.innerHTML = `
+
+            <span
+              class="w-3 h-3 rounded-full flex-shrink-0"
+              style="background:${color}"
+            ></span>
+
+            <span class="truncate">
+              ${escapeHTML(
+                business
+              )}
+            </span>
+
+          `;
+
+
+          container.appendChild(
+            row
+          );
+
+        }
+      );
+
+    }
+
+
+    /* =====================================================
+       PANEL EDITOR
+    ===================================================== */
+
+    const editorPanel =
+      document.getElementById(
+        "editorPanel"
+      );
+
+    const editorOverlay =
+      document.getElementById(
+        "editorOverlay"
+      );
+
+
+    function openEditor() {
+
+      editorPanel.classList.remove(
+        "translate-x-full"
+      );
+
+      editorOverlay.classList.remove(
+        "hidden"
+      );
+
+
+      renderBranchList();
+
+
+      /*
+        Leaflet debe recalcular su tamaño
+        después de cambiar el layout.
+      */
+
+      setTimeout(
+        refreshMapSize,
+        350
+      );
+
+    }
+
+
+    function closeEditor() {
+
+      editorPanel.classList.add(
+        "translate-x-full"
+      );
+
+      editorOverlay.classList.add(
+        "hidden"
+      );
+
+
+      resetForm();
+
+
+      /*
+        Recalcular tamaño después
+        de cerrar el panel.
+      */
+
+      setTimeout(
+        refreshMapSize,
+        350
+      );
+
+    }
+
+
+    document
+      .getElementById(
+        "openEditorBtn"
+      )
+      .addEventListener(
+        "click",
+        openEditor
+      );
+
+
+    document
+      .getElementById(
+        "closeEditorBtn"
+      )
+      .addEventListener(
+        "click",
+        closeEditor
+      );
+
+
+    editorOverlay.addEventListener(
+      "click",
+      closeEditor
+    );
+
+
+    /* =====================================================
+       FORMULARIO
+    ===================================================== */
+
+    const form =
+      document.getElementById(
+        "branchForm"
+      );
+
+
+    form.addEventListener(
+      "submit",
+      function(event) {
+
+        event.preventDefault();
+
+
+        const index =
+          Number(
+            document.getElementById(
+              "editIndex"
+            ).value
+          );
+
+
+        const branch = {
+
+          codigoBodega:
+            document.getElementById(
+              "codigoBodega"
+            ).value.trim(),
+
+          nombreSucursal:
+            document.getElementById(
+              "nombreSucursal"
+            ).value.trim(),
+
+          negocio:
+            document.getElementById(
+              "negocio"
+            ).value.trim(),
+
+          direccion:
+            document.getElementById(
+              "direccion"
+            ).value.trim(),
+
+          lat:
+            Number(
+              document.getElementById(
+                "lat"
+              ).value
+            ),
+
+          lng:
+            Number(
+              document.getElementById(
+                "lng"
+              ).value
+            ),
+
+          pedidosTotal:
+            parseInt(
+              document.getElementById(
+                "pedidosTotal"
+              ).value,
+              10
+            ),
+
+          pedidosCancelados:
+            parseInt(
+              document.getElementById(
+                "pedidosCancelados"
+              ).value,
+              10
+            )
+
+        };
+
+
+        branch.tasaCancelacion =
+          calculateCancellationRate(
+            branch.pedidosTotal,
+            branch.pedidosCancelados
+          );
+
+
+        if (index === -1) {
+
+          branches.push(
+            branch
+          );
+
+        } else {
+
+          branches[index] =
+            branch;
+
+        }
+
+
+        saveData();
+
+        updateBusinessFilter();
+
+        renderMarkers();
+
+        renderBranchList();
+
+        resetForm();
+
+
+        /*
+          Después de modificar datos,
+          mantener el mapa correctamente renderizado.
+        */
+
+        setTimeout(
+          refreshMapSize,
+          100
+        );
+
+      }
+    );
+
+
+    /* =====================================================
+       EDITAR SUCURSAL
+    ===================================================== */
+
+    function editBranch(index) {
+
+      const branch =
+        branches[index];
+
+
+      document.getElementById(
+        "editIndex"
+      ).value = index;
+
+
+      document.getElementById(
+        "codigoBodega"
+      ).value =
+        branch.codigoBodega;
+
+
+      document.getElementById(
+        "nombreSucursal"
+      ).value =
+        branch.nombreSucursal;
+
+
+      document.getElementById(
+        "negocio"
+      ).value =
+        branch.negocio;
+
+
+      document.getElementById(
+        "direccion"
+      ).value =
+        branch.direccion;
+
+
+      document.getElementById(
+        "lat"
+      ).value =
+        branch.lat;
+
+
+      document.getElementById(
+        "lng"
+      ).value =
+        branch.lng;
+
+
+      document.getElementById(
+        "pedidosTotal"
+      ).value =
+        branch.pedidosTotal;
+
+
+      document.getElementById(
+        "pedidosCancelados"
+      ).value =
+        branch.pedidosCancelados;
+
+
+      document.getElementById(
+        "formTitle"
+      ).textContent =
+        "Editar sucursal";
+
+
+      document
+        .getElementById(
+          "cancelEditBtn"
+        )
+        .classList.remove(
+          "hidden"
+        );
+
+
+      document
+        .getElementById(
+          "codigoBodega"
+        )
+        .focus();
+
+    }
+
+
+    /* =====================================================
+       ELIMINAR SUCURSAL
+    ===================================================== */
+
+    function deleteBranch(index) {
+
+      const branch =
+        branches[index];
+
+
+      const confirmed =
+        confirm(
+          `¿Eliminar la sucursal "${branch.nombreSucursal}"?`
+        );
+
+
+      if (!confirmed) {
+        return;
+      }
+
+
+      branches.splice(
+        index,
+        1
+      );
+
+
+      saveData();
+
+      updateBusinessFilter();
+
+      renderMarkers();
+
+      renderBranchList();
+
+      resetForm();
+
+
+      /*
+        Si todavía quedan sucursales,
+        ajustar nuevamente la vista.
+      */
+
+      if (branches.length > 0) {
+
+        centerMapOnBranches();
+
+      } else {
+
+        map.setView(
+          SANTA_CRUZ_CENTER,
+          DEFAULT_ZOOM
+        );
+
+      }
+
+
+      setTimeout(
+        refreshMapSize,
+        100
+      );
+
+    }
+
+
+    /* =====================================================
+       LISTA DE SUCURSALES
+    ===================================================== */
+
+    function renderBranchList() {
+
+      const container =
+        document.getElementById(
+          "branchList"
+        );
+
+
+      document.getElementById(
+        "editorCounter"
+      ).textContent =
+        branches.length;
+
+
+      container.innerHTML = "";
+
+
+      if (
+        branches.length === 0
+      ) {
+
+        container.innerHTML = `
+
+          <div class="
+            text-center
+            py-10
+            text-gray-400
+          ">
+
+            <div class="text-3xl mb-2">
+              📍
+            </div>
+
+            <p class="text-sm">
+              No existen sucursales registradas.
+            </p>
+
+          </div>
+
+        `;
+
+        return;
+
+      }
+
+
+      branches.forEach(
+        (branch, index) => {
+
+          const color =
+            getBusinessColor(
+              branch.negocio
+            );
+
+
+          const card =
+            document.createElement(
+              "div"
+            );
+
+
+          card.className =
+            "border rounded-xl p-3 hover:shadow-md transition";
+
+
+          card.innerHTML = `
+
+            <div class="
+              flex
+              items-start
+              justify-between
+              gap-2
+            ">
+
+              <div class="
+                flex
+                items-start
+                gap-2
+              ">
+
+                <span
+                  class="
+                    w-3
+                    h-3
+                    rounded-full
+                    mt-1.5
+                    flex-shrink-0
+                  "
+                  style="
+                    background:${color}
+                  "
+                ></span>
+
+
+                <div>
+
+                  <div class="
+                    font-semibold
+                    text-sm
+                  ">
+                    ${escapeHTML(
+                      branch.nombreSucursal
+                    )}
+                  </div>
+
+
+                  <div class="
+                    text-xs
+                    text-gray-500
+                  ">
+                    ${escapeHTML(
+                      branch.codigoBodega
+                    )}
+                    ·
+                    ${escapeHTML(
+                      branch.negocio
+                    )}
+                  </div>
+
+                </div>
+
+              </div>
+
+
+              <div class="
+                text-xs
+                font-bold
+                text-red-600
+              ">
+                ${Number(
+                  branch.tasaCancelacion
+                ).toFixed(2)}%
+              </div>
+
+            </div>
+
+
+            <div class="
+              text-xs
+              text-gray-500
+              mt-2
+            ">
+              ${escapeHTML(
+                branch.direccion
+              )}
+            </div>
+
+
+            <div class="
+              flex
+              items-center
+              justify-between
+              mt-3
+              gap-2
+            ">
+
+              <div class="
+                text-xs
+              ">
+
+                <strong>
+                  ${Number(
+                    branch.pedidosTotal
+                  ).toLocaleString("es-BO")}
+                </strong>
+
+                pedidos
+
+                ·
+
+                <strong class="text-red-600">
+                  ${Number(
+                    branch.pedidosCancelados
+                  ).toLocaleString("es-BO")}
+                </strong>
+
+                cancelados
+
+              </div>
+
+
+              <div class="
+                flex
+                gap-1
+                flex-shrink-0
+              ">
+
+                <button
+                  onclick="editBranch(${index})"
+                  class="
+                    px-2
+                    py-1
+                    text-xs
+                    bg-blue-50
+                    text-blue-700
+                    hover:bg-blue-100
+                    rounded
+                  "
+                >
+                  Editar
+                </button>
+
+
+                <button
+                  onclick="deleteBranch(${index})"
+                  class="
+                    px-2
+                    py-1
+                    text-xs
+                    bg-red-50
+                    text-red-700
+                    hover:bg-red-100
+                    rounded
+                  "
+                >
+                  Eliminar
+                </button>
+
+              </div>
+
+            </div>
+
+          `;
+
+
+          container.appendChild(
+            card
+          );
+
+        }
+      );
+
+    }
+
+
+    /* =====================================================
+       RESET FORMULARIO
+    ===================================================== */
+
+    function resetForm() {
+
+      form.reset();
+
+
+      document.getElementById(
+        "editIndex"
+      ).value = "-1";
+
+
+      document.getElementById(
+        "formTitle"
+      ).textContent =
+        "Agregar sucursal";
+
+
+      document
+        .getElementById(
+          "cancelEditBtn"
+        )
+        .classList.add(
+          "hidden"
+        );
+
+    }
+
+
+    document
+      .getElementById(
+        "cancelEditBtn"
+      )
+      .addEventListener(
+        "click",
+        resetForm
+      );
+
+
+    /* =====================================================
+       INICIALIZACIÓN
+    ===================================================== */
+
+    function initializeApp() {
+
+      /*
+        1. Cargar datos
+      */
+
+      loadData();
+
+
+      /*
+        2. Generar filtros
+      */
+
+      updateBusinessFilter();
+
+
+      /*
+        3. Dibujar marcadores
+      */
+
+      renderMarkers();
+
+
+      /*
+        4. CENTRAR EL MAPA SEGÚN LAS SUCURSALES
+      */
+
+      centerMapOnBranches();
+
+
+      /*
+        5. IMPORTANTE:
+        Leaflet necesita conocer el tamaño final
+        del contenedor después de que la página
+        haya terminado de renderizarse.
+      */
+
+      refreshMapSize();
+
+
+      /*
+        Segundo invalidateSize después de un pequeño
+        retraso para asegurar que Tailwind y el navegador
+        ya calcularon las dimensiones finales.
+      */
+
+      setTimeout(
+        function() {
+
+          refreshMapSize();
+
+          centerMapOnBranches();
+
+        },
+        300
+      );
+
+
+      /*
+        Tercer ajuste para casos de despliegue
+        donde el navegador tarda un poco más
+        en calcular el layout.
+      */
+
+      setTimeout(
+        function() {
+
+          refreshMapSize();
+
+        },
+        1000
+      );
+
+    }
+
+
+    /* =====================================================
+       DOM READY
+    ===================================================== */
+
+    if (
+      document.readyState ===
+      "loading"
+    ) {
+
+      document.addEventListener(
+        "DOMContentLoaded",
+        initializeApp
+      );
+
+    } else {
+
+      initializeApp();
+
+    }
+
+
+    /* =====================================================
+       RESPONSIVE
+       RECALCULAR LEAFLET AL CAMBIAR TAMAÑO
+    ===================================================== */
+
+    let resizeTimer;
+
+    window.addEventListener(
+      "resize",
+      function() {
+
+        clearTimeout(
+          resizeTimer
+        );
+
+        resizeTimer =
+          setTimeout(
+            function() {
+
+              refreshMapSize();
+
+            },
+            150
+          );
+
+      }
+    );
+
+
+    /*
+      También recalcular cuando cambia la orientación
+      del teléfono.
+    */
+
+    window.addEventListener(
+      "orientationchange",
+      function() {
+
+        setTimeout(
+          function() {
+
+            refreshMapSize();
+
+          },
+          300
+        );
+
+      }
+    );
+
+  </script>
 
 </body>
 </html>
